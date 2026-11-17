@@ -4,10 +4,7 @@ const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {
         rejectUnauthorized: false
-    },
-    max: 2, // Batasi maksimal 2 koneksi per instance serverless agar tidak terkena limit Max Clients
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
+    }
 });
 
 pool.on('connect', () => {

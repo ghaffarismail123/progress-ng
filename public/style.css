@@ -1,8 +1,4 @@
-html, body {
-    height: 100vh;
-    overflow: hidden;
-    margin: 0;
-    padding: 0;
+body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     color: #334155;
     background-color: #f8fafc;
@@ -10,20 +6,13 @@ html, body {
 }
 
 #wrapper {
-    height: 100vh;
-    display: flex;
-    overflow: hidden;
+    min-height: 100vh;
 }
 
 /* Sidebar & Menu Navigasi */
 .sidebar {
     width: 270px;
     min-width: 270px;
-    height: 100vh;
-    position: sticky;
-    top: 0;
-    overflow-y: auto;
-    flex-shrink: 0;
     background-color: #ffffff !important;
     border-right: 1px solid #e2e8f0 !important;
 }
@@ -60,18 +49,6 @@ html, body {
 
 .sidebar .nav-item-link.active-menu i {
     color: #1d4ed8 !important;
-}
-
-/* Kolom Kanan (Navbar + Konten yang bisa di-scroll mandiri) */
-.flex-grow-1.d-flex.flex-column {
-    height: 100vh;
-    overflow: hidden;
-}
-
-.container-fluid.p-4.flex-grow-1 {
-    overflow-y: auto;
-    flex-grow: 1;
-    max-height: calc(100vh - 70px);
 }
 
 /* Card & Tabel */
