@@ -1,16 +1,18 @@
 {
   "version": 2,
-  "regions": ["sin1"],
   "builds": [
     {
       "src": "progress.js",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["views/**", "public/**"]
+      }
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "progress.js"
+      "destination": "progress.js"
     }
   ]
 }
