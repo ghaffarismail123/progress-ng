@@ -1,0 +1,70 @@
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    color: #334155;
+    background-color: #f8fafc;
+    -webkit-font-smoothing: antialiased;
+}
+
+#wrapper {
+    min-height: 100vh;
+}
+
+/* Sidebar & Menu Navigasi */
+.sidebar {
+    width: 270px;
+    min-width: 270px;
+    background-color: #ffffff !important;
+    border-right: 1px solid #e2e8f0 !important;
+}
+
+.sidebar-heading {
+    background-color: #ffffff;
+    border-color: #f1f5f9 !important;
+}
+
+.sidebar .nav-item-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.65rem 1rem;
+    margin: 0.25rem 0.75rem;
+    border-radius: 6px !important;
+    color: #475569;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.92rem;
+    transition: all 0.15s ease-in-out;
+}
+
+.sidebar .nav-item-link:hover {
+    background-color: #f1f5f9;
+    color: #0f172a;
+}
+
+.sidebar .nav-item-link.active-menu {
+    background-color: #eff6ff !important;
+    color: #1d4ed8 !important;
+    font-weight: 600 !important;
+}
+
+.sidebar .nav-item-link.active-menu i {
+    color: #1d4ed8 !important;
+}
+
+/* Card & Tabel */
+.card {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.03);
+}
+
+.table thead th {
+    background-color: #edf5ff !important;
+    color: #1e293b !important;
+    font-weight: 600;
+    font-size: 0.84rem;
+    border-top: 1px solid #e2e8f0;
+    border-bottom: 1.5px solid #cbd5e1 !important;
+    padding: 0.75rem 0.65rem;
+}

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PROGRES.NG - BPS Kabupaten Bangka Tengah</title>
+    <!-- Bootstrap 5.3 & FontAwesome -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- CSS SISURAT Style -->
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+    <div id="wrapper" class="d-flex">
+        <!-- Sidebar ala SISURAT -->
+        <div class="sidebar d-flex flex-column p-3">
+            <div class="sidebar-heading text-center py-3 mb-3 border-bottom">
+                <!-- Logo BPS dari folder public/img/ -->
+                <img src="/img/bps.png" alt="Logo BPS" style="width: 42px; height: 42px; object-fit: contain;" onerror="this.src='/img/bps1.png'">
+                <h6 class="fw-bold text-dark mt-2 mb-0">PROGRES.NG</h6>
+                <small class="text-muted" style="font-size: 0.75rem;">BPS Kab. Bangka Tengah</small>
+            </div>
+
+            <ul class="nav flex-column mb-auto">
+                <li class="nav-item">
+                    <a href="/" class="nav-item-link <%= activePage === 'dashboard' ? 'active-menu' : '' %>">
+                        <span><i class="fa-solid fa-gauge-high me-2"></i> Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/entry" class="nav-item-link <%= activePage === 'entry' ? 'active-menu' : '' %>">
+                        <span><i class="fa-solid fa-folder-plus me-2"></i> Entri Kegiatan</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/pelaporan" class="nav-item-link <%= activePage === 'pelaporan' ? 'active-menu' : '' %>">
+                        <span><i class="fa-solid fa-file-lines me-2"></i> Pelaporan 12 Bulan</span>
+                    </a>
+                </li>
+            </ul>
+
+            <!-- Footer Sidebar / TA Badge -->
+            <div class="mt-auto pt-3 border-top text-center">
+                <span class="badge bg-light text-dark border px-3 py-2 fw-semibold">TA 2026</span>
+            </div>
+        </div>
+
+        <!-- Main Content Wrapper -->
+        <div class="flex-grow-1 d-flex flex-column" style="min-width: 0;">
+            <!-- Top Navbar -->
+            <nav class="navbar navbar-expand navbar-light bg-white border-bottom px-4 py-3 shadow-sm">
+                <span class="navbar-brand mb-0 h6 fw-bold text-secondary">
+                    <i class="fa-solid fa-chart-line text-primary me-2"></i> Sistem Monitoring & Evaluasi Kinerja (PROGRES.NG)
+                </span>
+                <ul class="navbar-nav ms-auto align-items-center">
+                    <li class="nav-item">
+                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-3 py-2 rounded-pill">
+                            <i class="fa-solid fa-circle-check me-1"></i> Online (Active DB)
+                        </span>
+                    </li>
+                </ul>
+            </nav>
+
+            <!-- Halaman Konten Utama -->
+            <div class="container-fluid p-4 flex-grow-1">
+                <%- include(bodyTemplate) %>
+            </div>
+
+            <!-- Footer Oranye Muda -->
+            <footer style="background-color: #fff7ed; border-top: 1px solid #fed7aa; color: #9a3412;" class="py-3 px-4 text-center small">
+                <span>Badan Pusat Statistik Kabupaten Bangka Tengah &copy; 2026</span> &bull; 
+                <span class="fw-semibold">PROGRES.NG V1.0</span>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

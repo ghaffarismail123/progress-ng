@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pelaporan - PROGRES.NG BPS Bangka Tengah</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        /* Gaya tabel disamakan dengan entri (tanpa garis vertikal, garis horizontal rapi) */
+        .table-pelaporan-clean {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        .table-pelaporan-clean th {
+            background-color: #212529 !important;
+            color: #ffffff !important;
+            border-top: 1px solid #212529;
+            border-bottom: 2px solid #000000 !important;
+            border-left: none !important;
+            border-right: none !important;
+            padding-top: 0.35rem !important;
+            padding-bottom: 0.35rem !important;
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+            font-size: 0.8rem !important;
+            vertical-align: middle;
+            text-align: center;
+        }
+        .table-pelaporan-clean th:first-child {
+            text-align: left !important;
+        }
+        .table-pelaporan-clean td {
+            border-top: none !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+            border-left: none !important;
+            border-right: none !important;
+            padding-top: 0.28rem !important;
+            padding-bottom: 0.28rem !important;
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+            font-size: 0.79rem !important;
+            vertical-align: middle;
+            text-align: center;
+        }
+        .table-pelaporan-clean td:first-child {
+            text-align: left !important;
+        }
+        .table-pelaporan-clean .btn-pen-compact {
+            padding: 0.12rem 0.35rem !important;
+            font-size: 0.71rem !important;
+            line-height: 1.2;
+        }
+        .sidebar-brand-sisurat {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-align: left !important;
+        }
+        .navbar-custom-uniform {
+            padding-top: 0.75rem !important;
+            padding-bottom: 0.75rem !important;
+        }
+        .brand-title-small {
+            font-size: 0.875rem !important;
+        }
+        .realtime-clock-modern {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(6px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            color: #475569;
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 0.3rem 0.8rem;
+            border-radius: 50rem;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+        }
+        .ta-pill-dropdown {
+            background: #ffffff;
+            border: 1px solid #0d6efd;
+            color: #0d6efd;
+            font-size: 0.8rem;
+            font-weight: 700;
+            padding: 0.3rem 0.75rem;
+            border-radius: 50rem;
+            box-shadow: 0 1px 2px rgba(13, 110, 253, 0.1);
+        }
+        .ta-pill-dropdown:focus {
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+        }
+    </style>
+</head>
+<body>
+    <div id="wrapper" class="d-flex">
+        <!-- Sidebar -->
+        <div class="sidebar d-flex flex-column p-3">
+            <div class="sidebar-heading py-3 mb-3 border-bottom sidebar-brand-sisurat">
+                <img src="/img/bps.png" alt="Logo BPS" style="width: 38px; height: 38px; object-fit: contain; flex-shrink: 0;" onerror="this.src='/img/bps1.png'">
+                <div>
+                    <h6 class="fw-bold text-dark mb-0" style="font-size: 0.95rem; line-height: 1.1;">PROGRES.NG</h6>
+                    <small class="text-muted" style="font-size: 0.68rem; line-height: 1;">BPS Kab. Bangka Tengah</small>
+                </div>
+            </div>
+            <ul class="nav flex-column mb-auto">
+                <li class="nav-item mb-1"><a href="/" class="nav-item-link"><span><i class="fa-solid fa-gauge-high me-2"></i> Dashboard</span></a></li>
+                <li class="nav-item mb-1"><a href="/entry" class="nav-item-link"><span><i class="fa-solid fa-folder-plus me-2"></i> Entri Kegiatan</span></a></li>
+                <li class="nav-item mb-1"><a href="/pelaporan" class="nav-item-link active-menu"><span><i class="fa-solid fa-file-lines me-2"></i> Pelaporan</span></a></li>
+            </ul>
+            <div class="mt-auto pt-3 border-top text-center"><span class="badge bg-light text-dark border px-3 py-2 fw-semibold">TA <%= typeof selectedYear !== 'undefined' ? selectedYear : '2026' %></span></div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-grow-1 d-flex flex-column" style="min-width: 0;">
+            <nav class="navbar navbar-expand navbar-light bg-white border-bottom px-4 shadow-sm navbar-custom-uniform">
+                <span class="navbar-brand mb-0 fw-bold text-secondary brand-title-small"><i class="fa-solid fa-chart-line text-primary me-2"></i> Sistem Monitoring Kinerja Tim (PROGRES.NG)</span>
+                <div class="ms-auto d-flex align-items-center gap-2">
+                    <select class="form-select form-select-sm ta-pill-dropdown w-auto cursor-pointer" onchange="location = this.value;">
+                        <option value="/pelaporan?year=2026" <%= (typeof selectedYear !== 'undefined' && selectedYear === '2026') ? 'selected' : '' %>>📅 TA 2026</option>
+                        <option value="/pelaporan?year=2025" <%= (typeof selectedYear !== 'undefined' && selectedYear === '2025') ? 'selected' : '' %>>📅 TA 2025</option>
+                        <option value="/pelaporan?year=2027" <%= (typeof selectedYear !== 'undefined' && selectedYear === '2027') ? 'selected' : '' %>>📅 TA 2027</option>
+                    </select>
+                    <span id="realtimeClock" class="realtime-clock-modern"></span>
+                    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-3 py-1 rounded-pill"><i class="fa-solid fa-circle-check me-1"></i> Online</span>
+                </div>
+            </nav>
+
+            <div class="container-fluid p-4 flex-grow-1">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h2>Pelaporan Kinerja per Kegiatan</h2>
+                    </div>
+                </div>
+
+                <% const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']; %>
+                <% const stages = [
+                    { key: 'Persiapan', label: '1. Persiapan' },
+                    { key: 'Pengumpulan', label: '2. Pengumpulan Data' },
+                    { key: 'Pengolahan', label: '3. Pengolahan' },
+                    { key: 'Analisis', label: '4. Analisis' },
+                    { key: 'Diseminasi', label: '5. Diseminasi' },
+                    { key: 'Dukungan', label: '6. Dukungan Adm' }
+                ]; %>
+
+                <% teams.forEach(team => { %>
+                    <% const teamActs = activities.filter(a => a.team.toLowerCase() === team.toLowerCase()); %>
+                    <% if (teamActs.length > 0) { %>
+                        <%
+                            let teamSum = 0;
+                            teamActs.forEach(act => {
+                                const actReps = reports.filter(r => r.activity_id === act.id);
+                                if (actReps.length > 0) {
+                                    actReps.sort((a, b) => b.month - a.month);
+                                    teamSum += (actReps[0].progress_percentage || 0);
+                                }
+                            });
+                            const teamAvgProgress = Number((teamSum / teamActs.length).toFixed(1));
+                        %>
+                        <div class="card p-3 mb-4 bg-white shadow-sm">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+                                <h5 class="text-primary fw-bold mb-0">
+                                    <i class="fa-solid fa-users me-2"></i> Tim <%= team %>
+                                    <span class="badge bg-light text-secondary border ms-1 fw-normal" style="font-size: 0.75rem;"><%= teamActs.length %> Kegiatan</span>
+                                </h5>
+                                <div class="d-flex align-items-center gap-2" style="min-width: 240px; max-width: 340px; flex: 1;">
+                                    <div class="progress flex-grow-1" style="height: 8px; background-color: #e2e8f0; border-radius: 999px;">
+                                        <div class="progress-bar <%= teamAvgProgress >= 100 ? 'bg-success' : 'bg-primary' %>" role="progressbar" style="width: <%= teamAvgProgress %>%; border-radius: 999px;"></div>
+                                    </div>
+                                    <span class="fw-bold text-dark small text-nowrap" style="min-width: 44px; text-align: right;"><%= teamAvgProgress %>%</span>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle table-pelaporan-clean mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 32%;">Nama Kegiatan / Survei</th>
+                                            <% months.forEach((m) => { %>
+                                                <th><%= m %></th>
+                                            <% }) %>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <% teamActs.forEach(act => { %>
+                                            <tr>
+                                                <td class="fw-semibold text-dark"><%= act.name %></td>
+                                                <% months.forEach((m, mIdx) => { %>
+                                                    <% 
+                                                        const mNum = mIdx + 1;
+                                                        const foundReport = reports.find(r => r.activity_id === act.id && r.month === mNum);
+                                                        
+                                                        const nowCheck = new Date();
+                                                        const currentYearCheck = nowCheck.getFullYear();
+                                                        const currentMonthCheck = nowCheck.getMonth() + 1;
+                                                        const targetYear = parseInt(typeof selectedYear !== 'undefined' ? selectedYear : currentYearCheck);
+                                                        const isLocked = (targetYear === currentYearCheck && mNum >= currentMonthCheck);
+                                                    %>
+                                                    <td>
+                                                        <div class="d-flex justify-content-center align-items-center gap-1">
+                                                            <% if (foundReport) { %>
+                                                                <span class="text-success" title="Sudah Dilapor"><i class="fa-solid fa-circle-check"></i></span>
+                                                            <% } %>
+                                                            <% if (isLocked) { %>
+                                                                <button class="btn btn-sm btn-pen-compact btn-outline-secondary opacity-50" disabled title="Belum dibuka (H-1 bulan)">
+                                                                    <i class="fa-solid fa-lock"></i>
+                                                                </button>
+                                                            <% } else { %>
+                                                                <button class="btn btn-sm btn-pen-compact <%= foundReport ? 'btn-outline-success' : 'btn-outline-primary' %> open-report-modal" 
+                                                                    data-activity-id="<%= act.id %>" 
+                                                                    data-activity-name="<%= act.name %>" 
+                                                                    data-month="<%= mNum %>" 
+                                                                    data-month-name="<%= m %>"
+                                                                    data-bs-toggle="modal" data-bs-target="#reportModal"
+                                                                    title="<%= foundReport ? 'Sunting' : 'Isi Laporan' %>">
+                                                                    <i class="fa-solid fa-pen-to-square"></i>
+                                                                </button>
+                                                            <% } %>
+                                                        </div>
+                                                    </td>
+                                                <% }) %>
+                                            </tr>
+                                        <% }) %>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    <% } %>
+                <% }) %>
+            </div>
+
+            <!-- Modal Detail Pelaporan -->
+            <div class="modal fade" id="reportModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <form action="/pelaporan/save" method="POST" class="modal-content">
+                        <div class="modal-header bg-dark text-white">
+                            <h5 class="modal-title">Form Pelaporan: <span id="modalActivityTitle"></span> (<span id="modalMonthName"></span>)</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <input type="hidden" name="activity_id" id="inputActivityId">
+                            <input type="hidden" name="month" id="inputMonth">
+                            <input type="hidden" name="year" value="<%= typeof selectedYear !== 'undefined' ? selectedYear : '2026' %>">
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Jenis Tahapan (1 - 6)</label>
+                                    <select name="stage_type" id="inputStageType" class="form-select" required>
+                                        <% stages.forEach(s => { %>
+                                            <option value="<%= s.key %>"><%= s.label %></option>
+                                        <% }) %>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Status Pelaksanaan</label>
+                                    <select name="stage_status" id="inputStageStatus" class="form-select" required>
+                                        <option value="Perencanaan">1. Perencanaan (0%)</option>
+                                        <option value="Persiapan">2. Persiapan (1% - 10%)</option>
+                                        <option value="Pelaksanaan">3. Pelaksanaan (11% - 99%)</option>
+                                        <option value="Selesai">4. Selesai (100%)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Besaran Progress (%) <span class="text-danger">*Tidak boleh kurang dari bulan sebelumnya</span></label>
+                                <input type="number" step="0.01" min="0" max="100" name="progress_percentage" id="inputProgress" class="form-control" placeholder="Contoh: 75.00" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Uraian / Catatan Kegiatan</label>
+                                <textarea name="description" id="inputDescription" class="form-control" rows="3" placeholder="Uraian apa saja yang dilakukan per bulan tersebut..."></textarea>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Permasalahan</label>
+                                    <textarea name="problem" id="inputProblem" class="form-control" rows="2" placeholder="Kendala atau permasalahan..."></textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Tindak Lanjut</label>
+                                    <textarea name="follow_up" id="inputFollowUp" class="form-control" rows="2" placeholder="Langkah tindak lanjut..."></textarea>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Tautan Bukti Dukung (Link PDF / Dokumen)</label>
+                                <input type="url" name="proof_link" id="inputProofLink" class="form-control" placeholder="https://tautan.id/buktidukung">
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                            <button type="submit" class="btn btn-primary">Simpan Laporan</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Modal Gagal & Berhasil -->
+            <div class="modal fade" id="errorSaveModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-danger shadow">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title fw-bold"><i class="fa-solid fa-triangle-exclamation me-2"></i> Laporan Gagal Tersimpan</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body py-4">
+                            <div class="alert alert-danger mb-0" id="errorSaveReason">Terjadi kesalahan.</div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary fw-semibold" data-bs-dismiss="modal">Mengerti</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal fade" id="successSaveModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-success shadow">
+                        <div class="modal-header bg-success text-white">
+                            <h5 class="modal-title fw-bold"><i class="fa-solid fa-circle-check me-2"></i> Laporan Berhasil Tersimpan</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body py-4 text-center">
+                            <i class="fa-solid fa-circle-check text-success mb-3" style="font-size: 3rem;"></i>
+                            <p class="fw-semibold text-dark mb-0">Data progres dan laporan kinerja telah berhasil disimpan.</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-success fw-semibold px-4" data-bs-dismiss="modal">OK</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <footer style="background-color: #ffffff; border-top: 1px solid #e2e8f0; color: #0d6efd;" class="py-2 px-4 text-center small">
+                <span>Badan Pusat Statistik Kabupaten Bangka Tengah &copy; 2026</span> &bull; <span class="fw-semibold">PROGRES.NG V1.0</span>
+            </footer>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function updateClock() {
+            const now = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+            document.getElementById('realtimeClock').innerHTML = '<i class="fa-regular fa-clock me-1 text-primary"></i> ' + now.toLocaleDateString('id-ID', options);
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('error')) {
+                document.getElementById('errorSaveReason').textContent = urlParams.get('error');
+                new bootstrap.Modal(document.getElementById('errorSaveModal')).show();
+                window.history.replaceState({}, document.title, window.location.pathname);
+            } else if (urlParams.get('success')) {
+                new bootstrap.Modal(document.getElementById('successSaveModal')).show();
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+
+            const reportModal = document.getElementById('reportModal');
+            if (reportModal) {
+                reportModal.addEventListener('show.bs.modal', async (event) => {
+                    const button = event.relatedTarget;
+                    const activityId = button.getAttribute('data-activity-id');
+                    document.getElementById('modalActivityTitle').textContent = button.getAttribute('data-activity-name');
+                    document.getElementById('modalMonthName').textContent = button.getAttribute('data-month-name');
+                    document.getElementById('inputActivityId').value = activityId;
+                    document.getElementById('inputMonth').value = button.getAttribute('data-month');
+                    loadReportData(activityId, button.getAttribute('data-month'), document.getElementById('inputStageType').value);
+                });
+
+                document.getElementById('inputStageType').addEventListener('change', (e) => {
+                    loadReportData(document.getElementById('inputActivityId').value, document.getElementById('inputMonth').value, e.target.value);
+                });
+
+                async function loadReportData(activityId, month, stageType) {
+                    try {
+                        const res = await fetch(`/api/report?activity_id=${activityId}&month=${month}&stage_type=${stageType}`);
+                        const data = await res.json();
+                        if (data && data.id) {
+                            document.getElementById('inputStageStatus').value = data.stage_status || 'Pelaksanaan';
+                            document.getElementById('inputProgress').value = data.progress_percentage || 0;
+                            document.getElementById('inputDescription').value = data.description || '';
+                            document.getElementById('inputProblem').value = data.problem || '';
+                            document.getElementById('inputFollowUp').value = data.follow_up || '';
+                            document.getElementById('inputProofLink').value = data.proof_link || '';
+                        } else {
+                            document.getElementById('inputStageStatus').value = 'Pelaksanaan';
+                            document.getElementById('inputProgress').value = '';
+                            document.getElementById('inputDescription').value = '';
+                            document.getElementById('inputProblem').value = '';
+                            document.getElementById('inputFollowUp').value = '';
+                            document.getElementById('inputProofLink').value = '';
+                        }
+                    } catch (err) { console.error(err); }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
