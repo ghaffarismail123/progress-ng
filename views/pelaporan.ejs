@@ -294,6 +294,40 @@
                 <% }) %>
             </div>
 
+            <!-- Modal Pilihan Bulan Export -->
+            <div class="modal fade" id="exportMonthModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-sm modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title"><i class="fa-solid fa-calendar-days text-success me-2"></i>Pilih Bulan Export</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <label for="selectExportMonth" class="form-label fw-bold">Bulan Pelaporan</label>
+                            <select id="selectExportMonth" class="form-select">
+                                <option value="all">Semua Bulan (Jan - Des)</option>
+                                <option value="1">Januari (Jan)</option>
+                                <option value="2">Februari (Feb)</option>
+                                <option value="3">Maret (Mar)</option>
+                                <option value="4">April (Apr)</option>
+                                <option value="5">Mei</option>
+                                <option value="6">Juni (Jun)</option>
+                                <option value="7">Juli (Jul)</option>
+                                <option value="8">Agustus (Agu)</option>
+                                <option value="9">September (Sep)</option>
+                                <option value="10">Oktober (Okt)</option>
+                                <option value="11">November (Nov)</option>
+                                <option value="12">Desember (Des)</option>
+                            </select>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
+                            <button type="button" class="btn btn-sm btn-success" id="btnConfirmExport">Unduh</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Modal Detail Pelaporan -->
             <div class="modal fade" id="reportModal" tabindex="-1">
                 <div class="modal-dialog modal-lg">
@@ -425,14 +459,19 @@
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
 
-            // Export semua isian form pelaporan tiap bulan & tiap kegiatan ke Excel / CSV
+            // Export semua isian form pelaporan tiap bulan & tiap kegiatan dengan pilihan bulan dulu
             const exportActivities = <%- JSON.stringify(safeActivities) %>;
             const exportReports = <%- JSON.stringify(safeReports) %>;
             const exportTeams = <%- JSON.stringify(safeTeams) %>;
             const yearLabel = '<%= activeYear %>';
             const exportMonthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 
-            function collectAllFormReportRows() {
+            let pendingExportFormat = 'xlsx';
+            const exportMonthModalEl = document.getElementById('exportMonthModal');
+            const exportMonthModal = exportMonthModalEl ? new bootstrap.Modal(exportMonthModalEl) : null;
+            const selectExportMonth = document.getElementById('selectExportMonth');
+
+            function collectReportRowsByMonth(monthFilter) {
                 const rows = [];
                 const teamOrder = new Map();
                 exportTeams.forEach((t, idx) => teamOrder.set(String(t).toLowerCase(), idx));
@@ -445,73 +484,82 @@
                 });
 
                 sortedActivities.forEach((act) => {
-                    const actReps = exportReports
+                    let actReps = exportReports
                         .filter((r) => r && Number(r.activity_id) === Number(act.id))
                         .sort((a, b) => Number(a.month) - Number(b.month));
 
-                    if (actReps.length > 0) {
-                        actReps.forEach((rep) => {
-                            const mIdx = Number(rep.month) - 1;
-                            rows.push({
-                                'Tahun Anggaran': yearLabel,
-                                'Tim': act.team || '',
-                                'Nama Kegiatan / Survei': act.name || '',
-                                'Bulan': exportMonthLabels[mIdx] || rep.month || '',
-                                'Jenis Tahapan': rep.stage_type || '',
-                                'Status Pelaksanaan': rep.stage_status || '',
-                                'Besaran Progress (%)': (rep.progress_percentage !== null && rep.progress_percentage !== undefined && rep.progress_percentage !== '') ? Number(rep.progress_percentage) : 0,
-                                'Uraian / Catatan Kegiatan': rep.description || '',
-                                'Permasalahan': rep.problem || '',
-                                'Tindak Lanjut': rep.follow_up || '',
-                                'Tautan Bukti Dukung': rep.proof_link || ''
-                            });
-                        });
-                    } else {
+                    if (monthFilter !== 'all') {
+                        const targetMonth = Number(monthFilter);
+                        actReps = actReps.filter((r) => Number(r.month) === targetMonth);
+                    }
+
+                    actReps.forEach((rep) => {
+                        const mIdx = Number(rep.month) - 1;
                         rows.push({
                             'Tahun Anggaran': yearLabel,
                             'Tim': act.team || '',
                             'Nama Kegiatan / Survei': act.name || '',
-                            'Bulan': '-',
-                            'Jenis Tahapan': '',
-                            'Status Pelaksanaan': 'Belum Ada Laporan',
-                            'Besaran Progress (%)': 0,
-                            'Uraian / Catatan Kegiatan': '',
-                            'Permasalahan': '',
-                            'Tindak Lanjut': '',
-                            'Tautan Bukti Dukung': ''
+                            'Bulan': exportMonthLabels[mIdx] || rep.month || '',
+                            'Jenis Tahapan': rep.stage_type || '',
+                            'Status Pelaksanaan': rep.stage_status || '',
+                            'Besaran Progress (%)': (rep.progress_percentage !== null && rep.progress_percentage !== undefined && rep.progress_percentage !== '') ? Number(rep.progress_percentage) : 0,
+                            'Uraian / Catatan Kegiatan': rep.description || '',
+                            'Permasalahan': rep.problem || '',
+                            'Tindak Lanjut': rep.follow_up || '',
+                            'Tautan Bukti Dukung': rep.proof_link || ''
                         });
-                    }
+                    });
                 });
 
                 return rows;
             }
 
+            function runExport(format, monthVal) {
+                const rows = collectReportRowsByMonth(monthVal);
+                const suffixMonth = monthVal === 'all' ? 'Semua_Bulan' : (exportMonthLabels[Number(monthVal) - 1] || monthVal);
+                const sheetName = (`Pelaporan_${suffixMonth}_${yearLabel}`).slice(0, 31);
+                const ws = XLSX.utils.json_to_sheet(rows.length ? rows : [{ Keterangan: 'Tidak ada data pelaporan untuk pilihan bulan ini' }]);
+
+                if (format === 'csv') {
+                    const csv = XLSX.utils.sheet_to_csv(ws);
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `Detail_Pelaporan_Kinerja_${suffixMonth}_TA_${yearLabel}.csv`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } else {
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                    XLSX.writeFile(wb, `Detail_Pelaporan_Kinerja_${suffixMonth}_TA_${yearLabel}.xlsx`);
+                }
+            }
+
             const btnExportExcel = document.getElementById('btnExportExcel');
             if (btnExportExcel) {
                 btnExportExcel.addEventListener('click', () => {
-                    const exportRows = collectAllFormReportRows();
-                    const ws = XLSX.utils.json_to_sheet(exportRows.length ? exportRows : [{ Keterangan: 'Tidak ada data pelaporan' }]);
-                    const wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, 'Detail_Pelaporan_' + yearLabel);
-                    XLSX.writeFile(wb, `Detail_Pelaporan_Kinerja_TA_${yearLabel}.xlsx`);
+                    pendingExportFormat = 'xlsx';
+                    if (exportMonthModal) exportMonthModal.show();
                 });
             }
 
             const btnExportCsv = document.getElementById('btnExportCsv');
             if (btnExportCsv) {
                 btnExportCsv.addEventListener('click', () => {
-                    const exportRows = collectAllFormReportRows();
-                    const ws = XLSX.utils.json_to_sheet(exportRows.length ? exportRows : [{ Keterangan: 'Tidak ada data pelaporan' }]);
-                    const csv = XLSX.utils.sheet_to_csv(ws);
-                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `Detail_Pelaporan_Kinerja_TA_${yearLabel}.csv`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
+                    pendingExportFormat = 'csv';
+                    if (exportMonthModal) exportMonthModal.show();
+                });
+            }
+
+            const btnConfirmExport = document.getElementById('btnConfirmExport');
+            if (btnConfirmExport) {
+                btnConfirmExport.addEventListener('click', () => {
+                    const monthVal = selectExportMonth ? selectExportMonth.value : 'all';
+                    if (exportMonthModal) exportMonthModal.hide();
+                    runExport(pendingExportFormat, monthVal);
                 });
             }
 
