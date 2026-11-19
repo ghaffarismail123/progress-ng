@@ -34,21 +34,35 @@ app.get(['/favicon.ico', '/favicon.png'], (req, res) => {
 
 function injectFavicon(html) {
     if (typeof html !== 'string' || !html.includes('</head>')) return html;
+
     const iconHref = fs.existsSync(path.join(__dirname, 'public', 'img', 'bps.png'))
-        ? '/img/bps.png?v=2'
-        : '/img/bps1.png?v=2';
+        ? '/img/bps.png?v=3'
+        : '/img/bps1.png?v=3';
+
     const faviconTags = [
         `<link rel="icon" type="image/png" sizes="32x32" href="${iconHref}">`,
         `<link rel="shortcut icon" type="image/png" href="${iconHref}">`,
         `<link rel="apple-touch-icon" href="${iconHref}">`
     ].join('\n');
 
-    if (html.includes('rel="icon"')) {
-        return html.replace(/<link[^>]*rel=["'](?:shortcut )?icon["'][^>]*>/gi, '');
-    }
-    return html.replace('</head>', `${faviconTags}\n</head>`);
-}
+    let updated = html.replace(/<link[^>]*rel=["'](?:shortcut\s+)?icon["'][^>]*>\s*/gi, '');
+    updated = updated.replace('</head>', `${faviconTags}\n</head>`);
 
+    // Pastikan judul tab menampilkan PROGRES.NG
+    if (/<title>[\s\S]*?<\/title>/i.test(updated)) {
+        updated = updated.replace(/<title>([\s\S]*?)<\/title>/i, (_, innerTitle) => {
+            const cleanTitle = String(innerTitle || '').trim();
+            if (/progress\.?ng/i.test(cleanTitle)) {
+                return `<title>${cleanTitle}</title>`;
+            }
+            return `<title>PROGRES.NG - ${cleanTitle || 'BPS Kab. Bangka Tengah'}</title>`;
+        });
+    } else {
+        updated = updated.replace('</head>', `<title>PROGRES.NG - BPS Kab. Bangka Tengah</title>\n</head>`);
+    }
+
+    return updated;
+}
 // Pasang favicon BPS otomatis untuk semua halaman HTML/EJS (baik res.render maupun res.send)
 app.use((req, res, next) => {
     const originalSend = res.send.bind(res);
