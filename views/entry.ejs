@@ -152,19 +152,21 @@
                             <thead>
                                 <tr>
                                     <th style="width: 4%;">#</th>
-                                    <th style="width: 14%;">Tim Kerja</th>
-                                    <th style="width: 16%;">Sub Tim</th>
-                                    <th style="width: 13%;">Kode RO</th>
+                                    <th style="width: 13%;">Tim Kerja</th>
+                                    <th style="width: 14%;">Sub Tim</th>
+                                    <th style="width: 12%;">Kode RO</th>
                                     <th>Nama Kegiatan / Survei</th>
-                                    <th style="width: 12%;">Jenis</th>
-                                    <th class="text-center" style="width: 14%;">Aksi</th>
+                                    <th style="width: 11%;">Jenis</th>
+                                    <th style="width: 10%;">Target</th>
+                                    <th class="text-center" style="width: 13%;">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <% if (!activities || activities.length === 0) { %>
-                                    <tr><td colspan="7" class="text-center text-muted py-4">Tidak ada kegiatan ditemukan. Klik "Import Excel Kegiatan" atau "Tambah Kegiatan Baru".</td></tr>
+                                    <tr><td colspan="8" class="text-center text-muted py-4">Tidak ada kegiatan ditemukan. Klik "Import Excel Kegiatan" atau "Tambah Kegiatan Baru".</td></tr>
                                 <% } else { %>
                                     <% activities.forEach((act, index) => { %>
+                                        <% const targetVal = (act.target !== undefined && act.target !== null && act.target !== '') ? act.target : ((act.initial_target !== undefined && act.initial_target !== null && act.initial_target !== '') ? act.initial_target : '-'); %>
                                         <tr>
                                             <td><%= index + 1 %></td>
                                             <td><span class="badge bg-secondary"><%= act.team %></span></td>
@@ -172,6 +174,7 @@
                                             <td><code><%= act.ro_code %></code></td>
                                             <td><strong><%= act.name %></strong></td>
                                             <td><span class="badge bg-info text-dark"><%= act.jenis || 'Kegiatan' %></span></td>
+                                            <td><span class="fw-semibold text-dark"><%= targetVal %></span></td>
                                             <td class="text-center">
                                                 <div class="d-flex justify-content-center gap-1">
                                                     <!-- Tombol Sunting (Edit) -->
@@ -182,6 +185,7 @@
                                                         data-ro-code="<%= act.ro_code %>"
                                                         data-name="<%= act.name %>"
                                                         data-jenis="<%= act.jenis || '' %>"
+                                                        data-target="<%= targetVal !== '-' ? targetVal : '' %>"
                                                         data-bs-toggle="modal" data-bs-target="#editActivityModal" title="Sunting Kegiatan">
                                                         <i class="fa-solid fa-pen-to-square"></i> Sunting
                                                     </button>
@@ -241,8 +245,12 @@
                                     <label for="excelFileInput" class="form-label fw-bold">Pilih File Excel (.xlsx / .xls)</label>
                                     <input type="file" id="excelFileInput" name="excel_file" class="form-control" accept=".xlsx,.xls" required>
                                     <div class="form-text text-muted mt-2">
-                                        Mendukung format tabel (Tim Kerja, Sub Tim, Kode RO, Nama Kegiatan, Jenis) maupun file Caput BPS.
+                                        Mendukung format tabel (Tim Kerja, Sub Tim, Kode RO, Nama Kegiatan, Jenis, Target) maupun file Caput BPS.
                                     </div>
+                                </div>
+                                <div class="mb-2">
+                                    <label for="importDefaultTarget" class="form-label fw-bold">Target Awal Default (Jika kolom Target di Excel kosong)</label>
+                                    <input type="number" step="1" min="0" id="importDefaultTarget" name="default_target" class="form-control" placeholder="Contoh: 1 atau 100 (opsional)">
                                 </div>
                             </div>
                             <div class="modal-footer">
@@ -292,6 +300,10 @@
                                     <label class="form-label fw-bold">Jenis</label>
                                     <input type="text" name="jenis" class="form-control" placeholder="Contoh: Survei / Laporan / Pendataan">
                                 </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Target Awal Kegiatan</label>
+                                    <input type="number" step="1" min="0" name="target" class="form-control" placeholder="Contoh: 1 atau 250">
+                                </div>
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
@@ -340,6 +352,10 @@
                                 <label class="form-label fw-bold">Jenis</label>
                                 <input type="text" name="jenis" id="editActivityJenis" class="form-control" placeholder="Contoh: Survei / Laporan / Pendataan">
                             </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Target Awal Kegiatan</label>
+                                <input type="number" step="1" min="0" name="target" id="editActivityTarget" class="form-control" placeholder="Contoh: 1 atau 250">
+                            </div>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
@@ -375,6 +391,7 @@
                     document.getElementById('editActivityRoCode').value = button.getAttribute('data-ro-code');
                     document.getElementById('editActivityName').value = button.getAttribute('data-name');
                     document.getElementById('editActivityJenis').value = button.getAttribute('data-jenis');
+                    document.getElementById('editActivityTarget').value = button.getAttribute('data-target') || '';
                 });
             }
         });
