@@ -3,6 +3,8 @@ const xlsx = require('xlsx');
 const upload = multer({ storage: multer.memoryStorage() });
 const express = require('express');
 const bodyParser = require('body-parser');
+const path = require('path');
+const fs = require('fs');
 const db = require('./database');
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,6 +13,67 @@ app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(express.static('public'));
+
+function resolveBpsIconPath() {
+    const primaryPath = path.join(__dirname, 'public', 'img', 'bps.png');
+    const fallbackPath = path.join(__dirname, 'public', 'img', 'bps1.png');
+    if (fs.existsSync(primaryPath)) return primaryPath;
+    if (fs.existsSync(fallbackPath)) return fallbackPath;
+    return null;
+}
+
+// Layani /favicon.ico dan /favicon.png langsung agar browser tidak menampilkan ikon bumi default
+app.get(['/favicon.ico', '/favicon.png'], (req, res) => {
+    const iconFile = resolveBpsIconPath();
+    if (iconFile) {
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return res.sendFile(iconFile);
+    }
+    res.status(204).end();
+});
+
+function injectFavicon(html) {
+    if (typeof html !== 'string' || !html.includes('</head>')) return html;
+    const iconHref = fs.existsSync(path.join(__dirname, 'public', 'img', 'bps.png'))
+        ? '/img/bps.png?v=2'
+        : '/img/bps1.png?v=2';
+    const faviconTags = [
+        `<link rel="icon" type="image/png" sizes="32x32" href="${iconHref}">`,
+        `<link rel="shortcut icon" type="image/png" href="${iconHref}">`,
+        `<link rel="apple-touch-icon" href="${iconHref}">`
+    ].join('\n');
+
+    if (html.includes('rel="icon"')) {
+        return html.replace(/<link[^>]*rel=["'](?:shortcut )?icon["'][^>]*>/gi, '');
+    }
+    return html.replace('</head>', `${faviconTags}\n</head>`);
+}
+
+// Pasang favicon BPS otomatis untuk semua halaman HTML/EJS (baik res.render maupun res.send)
+app.use((req, res, next) => {
+    const originalSend = res.send.bind(res);
+    res.send = (body) => {
+        return originalSend(injectFavicon(body));
+    };
+
+    const originalRender = res.render.bind(res);
+    res.render = (view, options, callback) => {
+        if (typeof options === 'function') {
+            callback = options;
+            options = {};
+        }
+        return originalRender(view, options || {}, (err, html) => {
+            if (err) {
+                if (callback) return callback(err);
+                return next(err);
+            }
+            const updatedHtml = injectFavicon(html);
+            if (callback) return callback(null, updatedHtml);
+            return res.send(updatedHtml);
+        });
+    };
+    next();
+});
 
 function calculateProgressData(activities, reports) {
     const totalActivities = activities.length;
@@ -136,14 +199,12 @@ app.post('/entry/import', upload.single('excel_file'), async (req, res) => {
             const rows = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 
             rows.forEach((row) => {
-                // Kolom A[0]: No, Kolom B[1]: Kode RO, Kolom C[2]: Tim, Kolom D[3]: Sub Tim, Kolom E[4]: Nama Kegiatan, Kolom F[5]: Jenis (opsional)
                 const colB = String(row[1] || '').trim();
                 const colC = String(row[2] || '').trim();
                 const colD = String(row[3] || '').trim();
                 const colE = String(row[4] || '').trim();
                 const colF = String(row[5] || '').trim();
 
-                // Lewati baris kosong atau baris header
                 if (!colB || !colC || !colE) return;
                 if (['kode ro', 'ro', 'tim', 'no'].includes(colB.toLowerCase()) || ['tim', 'tim kerja'].includes(colC.toLowerCase())) {
                     return;
