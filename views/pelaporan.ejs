@@ -217,7 +217,7 @@
                             });
                             const teamAvgProgress = Number((teamSum / teamActs.length).toFixed(1));
                         %>
-                        <div class="card p-3 mb-4 bg-white shadow-sm">
+                        <div class="card p-3 mb-4 bg-white shadow-sm" data-team-name="<%= team %>">
                             <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
                                 <h5 class="text-primary fw-bold mb-0">
                                     <i class="fa-solid fa-users me-2"></i> Tim <%= team %>
@@ -256,7 +256,7 @@
                                                         const targetYear = parseInt(typeof selectedYear !== 'undefined' ? selectedYear : currentYearCheck);
                                                         const isLocked = (targetYear === currentYearCheck && mNum >= currentMonthCheck);
                                                     %>
-                                                    <td>
+                                                    <td data-reported="<%= foundReport ? '1' : '0' %>" data-progress="<%= foundReport && foundReport.progress_percentage !== null && foundReport.progress_percentage !== undefined ? foundReport.progress_percentage : '' %>">
                                                         <div class="d-flex justify-content-center align-items-center gap-1">
                                                             <% if (foundReport) { %>
                                                                 <span class="text-success" title="Sudah Dilapor"><i class="fa-solid fa-circle-check"></i></span>
@@ -420,32 +420,46 @@
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
 
-            // Export Pelaporan ke Excel / CSV
-            const exportRows = [];
-            <% const exportMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']; %>
-            <% teams.forEach(team => { %>
-                <% const tActs = activities.filter(a => a.team.toLowerCase() === team.toLowerCase()); %>
-                <% tActs.forEach(act => { %>
-                    <%
+            // Export Pelaporan ke Excel / CSV dari tabel yang tampil
+            function collectExportRows() {
+                const monthCols = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+                const rows = [];
+                document.querySelectorAll('.card[data-team-name]').forEach((card) => {
+                    const teamName = card.getAttribute('data-team-name') || '';
+                    card.querySelectorAll('tbody tr').forEach((tr) => {
+                        const cells = tr.querySelectorAll('td');
+                        if (!cells.length) return;
+                        const actName = (cells[0].textContent || '').trim();
                         const rowObj = {
-                            Tim: '<%= team %>',
-                            'Nama Kegiatan / Survei': <%- JSON.stringify(act.name) %>
+                            'Tim': teamName,
+                            'Nama Kegiatan / Survei': actName
                         };
-                        exportMonths.forEach((m, mIdx) => {
-                            const mNum = mIdx + 1;
-                            const rep = reports.find(r => r.activity_id === act.id && r.month === mNum);
-                            rowObj[m] = rep ? (rep.progress_percentage !== null && rep.progress_percentage !== undefined ? Number(rep.progress_percentage) : 'Dilapor') : '-';
+                        monthCols.forEach((m, idx) => {
+                            const td = cells[idx + 1];
+                            if (!td) {
+                                rowObj[m] = '-';
+                                return;
+                            }
+                            const reported = td.getAttribute('data-reported') === '1';
+                            const prog = td.getAttribute('data-progress');
+                            if (reported) {
+                                rowObj[m] = (prog !== null && prog !== '') ? Number(prog) : 'Dilapor';
+                            } else {
+                                rowObj[m] = '-';
+                            }
                         });
-                    %>
-                    exportRows.push(<%- JSON.stringify(rowObj) %>);
-                <% }) %>
-            <% }) %>
+                        rows.push(rowObj);
+                    });
+                });
+                return rows;
+            }
 
             const yearLabel = '<%= typeof selectedYear !== "undefined" ? selectedYear : "2026" %>';
 
             const btnExportExcel = document.getElementById('btnExportExcel');
             if (btnExportExcel) {
                 btnExportExcel.addEventListener('click', () => {
+                    const exportRows = collectExportRows();
                     const ws = XLSX.utils.json_to_sheet(exportRows.length ? exportRows : [{ Keterangan: 'Tidak ada data pelaporan' }]);
                     const wb = XLSX.utils.book_new();
                     XLSX.utils.book_append_sheet(wb, ws, 'Pelaporan_' + yearLabel);
@@ -456,6 +470,7 @@
             const btnExportCsv = document.getElementById('btnExportCsv');
             if (btnExportCsv) {
                 btnExportCsv.addEventListener('click', () => {
+                    const exportRows = collectExportRows();
                     const ws = XLSX.utils.json_to_sheet(exportRows.length ? exportRows : [{ Keterangan: 'Tidak ada data pelaporan' }]);
                     const csv = XLSX.utils.sheet_to_csv(ws);
                     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
