@@ -425,64 +425,89 @@
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
 
-            // Export Pelaporan ke Excel / CSV dari tabel yang tampil
-            function collectExportRows() {
-                const monthCols = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+            // Export semua isian form pelaporan tiap bulan & tiap kegiatan ke Excel / CSV
+            const exportActivities = <%- JSON.stringify(safeActivities) %>;
+            const exportReports = <%- JSON.stringify(safeReports) %>;
+            const exportTeams = <%- JSON.stringify(safeTeams) %>;
+            const yearLabel = '<%= activeYear %>';
+            const exportMonthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+            function collectAllFormReportRows() {
                 const rows = [];
-                document.querySelectorAll('.card[data-team-name]').forEach((card) => {
-                    const teamName = card.getAttribute('data-team-name') || '';
-                    card.querySelectorAll('tbody tr').forEach((tr) => {
-                        const cells = tr.querySelectorAll('td');
-                        if (!cells.length) return;
-                        const actName = (cells[0].textContent || '').trim();
-                        const rowObj = {
-                            'Tim': teamName,
-                            'Nama Kegiatan / Survei': actName
-                        };
-                        monthCols.forEach((m, idx) => {
-                            const td = cells[idx + 1];
-                            if (!td) {
-                                rowObj[m] = '-';
-                                return;
-                            }
-                            const reported = td.getAttribute('data-reported') === '1';
-                            const prog = td.getAttribute('data-progress');
-                            if (reported) {
-                                rowObj[m] = (prog !== null && prog !== '') ? Number(prog) : 'Dilapor';
-                            } else {
-                                rowObj[m] = '-';
-                            }
-                        });
-                        rows.push(rowObj);
-                    });
+                const teamOrder = new Map();
+                exportTeams.forEach((t, idx) => teamOrder.set(String(t).toLowerCase(), idx));
+
+                const sortedActivities = [...exportActivities].sort((a, b) => {
+                    const ta = teamOrder.has(String(a.team || '').toLowerCase()) ? teamOrder.get(String(a.team || '').toLowerCase()) : 999;
+                    const tb = teamOrder.has(String(b.team || '').toLowerCase()) ? teamOrder.get(String(b.team || '').toLowerCase()) : 999;
+                    if (ta !== tb) return ta - tb;
+                    return String(a.name || '').localeCompare(String(b.name || ''), 'id');
                 });
+
+                sortedActivities.forEach((act) => {
+                    const actReps = exportReports
+                        .filter((r) => r && Number(r.activity_id) === Number(act.id))
+                        .sort((a, b) => Number(a.month) - Number(b.month));
+
+                    if (actReps.length > 0) {
+                        actReps.forEach((rep) => {
+                            const mIdx = Number(rep.month) - 1;
+                            rows.push({
+                                'Tahun Anggaran': yearLabel,
+                                'Tim': act.team || '',
+                                'Nama Kegiatan / Survei': act.name || '',
+                                'Bulan': exportMonthLabels[mIdx] || rep.month || '',
+                                'Jenis Tahapan': rep.stage_type || '',
+                                'Status Pelaksanaan': rep.stage_status || '',
+                                'Besaran Progress (%)': (rep.progress_percentage !== null && rep.progress_percentage !== undefined && rep.progress_percentage !== '') ? Number(rep.progress_percentage) : 0,
+                                'Uraian / Catatan Kegiatan': rep.description || '',
+                                'Permasalahan': rep.problem || '',
+                                'Tindak Lanjut': rep.follow_up || '',
+                                'Tautan Bukti Dukung': rep.proof_link || ''
+                            });
+                        });
+                    } else {
+                        rows.push({
+                            'Tahun Anggaran': yearLabel,
+                            'Tim': act.team || '',
+                            'Nama Kegiatan / Survei': act.name || '',
+                            'Bulan': '-',
+                            'Jenis Tahapan': '',
+                            'Status Pelaksanaan': 'Belum Ada Laporan',
+                            'Besaran Progress (%)': 0,
+                            'Uraian / Catatan Kegiatan': '',
+                            'Permasalahan': '',
+                            'Tindak Lanjut': '',
+                            'Tautan Bukti Dukung': ''
+                        });
+                    }
+                });
+
                 return rows;
             }
-
-            const yearLabel = '<%= activeYear %>';
 
             const btnExportExcel = document.getElementById('btnExportExcel');
             if (btnExportExcel) {
                 btnExportExcel.addEventListener('click', () => {
-                    const exportRows = collectExportRows();
+                    const exportRows = collectAllFormReportRows();
                     const ws = XLSX.utils.json_to_sheet(exportRows.length ? exportRows : [{ Keterangan: 'Tidak ada data pelaporan' }]);
                     const wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, 'Pelaporan_' + yearLabel);
-                    XLSX.writeFile(wb, `Pelaporan_Kinerja_TA_${yearLabel}.xlsx`);
+                    XLSX.utils.book_append_sheet(wb, ws, 'Detail_Pelaporan_' + yearLabel);
+                    XLSX.writeFile(wb, `Detail_Pelaporan_Kinerja_TA_${yearLabel}.xlsx`);
                 });
             }
 
             const btnExportCsv = document.getElementById('btnExportCsv');
             if (btnExportCsv) {
                 btnExportCsv.addEventListener('click', () => {
-                    const exportRows = collectExportRows();
+                    const exportRows = collectAllFormReportRows();
                     const ws = XLSX.utils.json_to_sheet(exportRows.length ? exportRows : [{ Keterangan: 'Tidak ada data pelaporan' }]);
                     const csv = XLSX.utils.sheet_to_csv(ws);
                     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `Pelaporan_Kinerja_TA_${yearLabel}.csv`;
+                    a.download = `Detail_Pelaporan_Kinerja_TA_${yearLabel}.csv`;
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
