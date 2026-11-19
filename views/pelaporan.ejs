@@ -101,7 +101,7 @@
             border: none;
             border-radius: 12px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-            font-size: 0.82rem !important; /* Font mengikuti proporsi tabel */
+            font-size: 0.82rem !important;
         }
         .modal-header {
             background-color: #f8f9fa;
@@ -171,7 +171,25 @@
             <div class="container-fluid p-4 flex-grow-1">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <div>
-                        <h2>Pelaporan Kinerja per Kegiatan</h2>
+                        <h2 class="mb-0">Pelaporan Kinerja per Kegiatan</h2>
+                    </div>
+                    <!-- Menu Export -->
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-success dropdown-toggle fw-semibold px-3" type="button" id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fa-solid fa-file-export me-1"></i> Export
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="exportDropdown">
+                            <li>
+                                <button class="dropdown-item small py-2" type="button" id="btnExportExcel">
+                                    <i class="fa-solid fa-file-excel text-success me-2"></i> Export Excel (.xlsx)
+                                </button>
+                            </li>
+                            <li>
+                                <button class="dropdown-item small py-2" type="button" id="btnExportCsv">
+                                    <i class="fa-solid fa-file-csv text-primary me-2"></i> Export CSV (.csv)
+                                </button>
+                            </li>
+                        </ul>
                     </div>
                 </div>
 
@@ -381,6 +399,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <script>
         function updateClock() {
             const now = new Date();
@@ -399,6 +418,56 @@
             } else if (urlParams.get('success')) {
                 new bootstrap.Modal(document.getElementById('successSaveModal')).show();
                 window.history.replaceState({}, document.title, window.location.pathname);
+            }
+
+            // Export Pelaporan ke Excel / CSV
+            const exportRows = [];
+            <% const exportMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']; %>
+            <% teams.forEach(team => { %>
+                <% const tActs = activities.filter(a => a.team.toLowerCase() === team.toLowerCase()); %>
+                <% tActs.forEach(act => { %>
+                    <%
+                        const rowObj = {
+                            Tim: '<%= team %>',
+                            'Nama Kegiatan / Survei': <%- JSON.stringify(act.name) %>
+                        };
+                        exportMonths.forEach((m, mIdx) => {
+                            const mNum = mIdx + 1;
+                            const rep = reports.find(r => r.activity_id === act.id && r.month === mNum);
+                            rowObj[m] = rep ? (rep.progress_percentage !== null && rep.progress_percentage !== undefined ? Number(rep.progress_percentage) : 'Dilapor') : '-';
+                        });
+                    %>
+                    exportRows.push(<%- JSON.stringify(rowObj) %>);
+                <% }) %>
+            <% }) %>
+
+            const yearLabel = '<%= typeof selectedYear !== "undefined" ? selectedYear : "2026" %>';
+
+            const btnExportExcel = document.getElementById('btnExportExcel');
+            if (btnExportExcel) {
+                btnExportExcel.addEventListener('click', () => {
+                    const ws = XLSX.utils.json_to_sheet(exportRows.length ? exportRows : [{ Keterangan: 'Tidak ada data pelaporan' }]);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, 'Pelaporan_' + yearLabel);
+                    XLSX.writeFile(wb, `Pelaporan_Kinerja_TA_${yearLabel}.xlsx`);
+                });
+            }
+
+            const btnExportCsv = document.getElementById('btnExportCsv');
+            if (btnExportCsv) {
+                btnExportCsv.addEventListener('click', () => {
+                    const ws = XLSX.utils.json_to_sheet(exportRows.length ? exportRows : [{ Keterangan: 'Tidak ada data pelaporan' }]);
+                    const csv = XLSX.utils.sheet_to_csv(ws);
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `Pelaporan_Kinerja_TA_${yearLabel}.csv`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                });
             }
 
             const reportModal = document.getElementById('reportModal');
