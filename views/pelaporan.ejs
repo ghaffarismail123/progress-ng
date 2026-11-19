@@ -441,9 +441,11 @@
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <script>
         function updateClock() {
+            const el = document.getElementById('realtimeClock');
+            if (!el) return;
             const now = new Date();
             const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
-            document.getElementById('realtimeClock').innerHTML = '<i class="fa-regular fa-clock me-1 text-primary"></i> ' + now.toLocaleDateString('id-ID', options);
+            el.innerHTML = '<i class="fa-regular fa-clock me-1 text-primary"></i> ' + now.toLocaleDateString('id-ID', options);
         }
         setInterval(updateClock, 1000);
         updateClock();
@@ -451,24 +453,37 @@
         document.addEventListener('DOMContentLoaded', () => {
             const urlParams = new URLSearchParams(window.location.search);
             if (urlParams.get('error')) {
-                document.getElementById('errorSaveReason').textContent = urlParams.get('error');
-                new bootstrap.Modal(document.getElementById('errorSaveModal')).show();
+                const errReason = document.getElementById('errorSaveReason');
+                const errModalEl = document.getElementById('errorSaveModal');
+                if (errReason) errReason.textContent = urlParams.get('error');
+                if (errModalEl && window.bootstrap) {
+                    bootstrap.Modal.getOrCreateInstance(errModalEl).show();
+                }
                 window.history.replaceState({}, document.title, window.location.pathname);
             } else if (urlParams.get('success')) {
-                new bootstrap.Modal(document.getElementById('successSaveModal')).show();
+                const succModalEl = document.getElementById('successSaveModal');
+                if (succModalEl && window.bootstrap) {
+                    bootstrap.Modal.getOrCreateInstance(succModalEl).show();
+                }
                 window.history.replaceState({}, document.title, window.location.pathname);
             }
 
-            // Export semua kegiatan beserta detail isian form pelaporan sesuai bulan yang dipilih
-            const exportActivities = <%- JSON.stringify(safeActivities) %>;
-            const exportReports = <%- JSON.stringify(safeReports) %>;
-            const exportTeams = <%- JSON.stringify(safeTeams) %>;
+            let exportActivities = [];
+            let exportReports = [];
+            let exportTeams = [];
+            try {
+                exportActivities = JSON.parse(<%- JSON.stringify(JSON.stringify(safeActivities || [])) %>);
+                exportReports = JSON.parse(<%- JSON.stringify(JSON.stringify(safeReports || [])) %>);
+                exportTeams = JSON.parse(<%- JSON.stringify(JSON.stringify(safeTeams || [])) %>);
+            } catch (e) {
+                console.error('Gagal parse data export:', e);
+            }
+
             const yearLabel = '<%= activeYear %>';
             const exportMonthLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 
             let pendingExportFormat = 'xlsx';
             const exportMonthModalEl = document.getElementById('exportMonthModal');
-            const exportMonthModal = exportMonthModalEl ? new bootstrap.Modal(exportMonthModalEl) : null;
             const selectExportMonth = document.getElementById('selectExportMonth');
 
             function buildExportRow(act, monthLabel, rep) {
@@ -546,6 +561,10 @@
             }
 
             function runExport(format, monthVal) {
+                if (typeof XLSX === 'undefined') {
+                    alert('Library export (SheetJS) belum termuat. Silakan muat ulang halaman.');
+                    return;
+                }
                 const rows = collectAllActivitiesReportRows(monthVal);
                 const suffixMonth = monthVal === 'all' ? 'Semua_Bulan' : (exportMonthLabels[Number(monthVal) - 1] || monthVal);
                 const sheetName = (`Pelaporan_${suffixMonth}_${yearLabel}`).slice(0, 31);
@@ -569,19 +588,31 @@
                 }
             }
 
+            function openMonthChooser(format) {
+                pendingExportFormat = format;
+                if (exportMonthModalEl && window.bootstrap) {
+                    bootstrap.Modal.getOrCreateInstance(exportMonthModalEl).show();
+                } else {
+                    const chosen = prompt('Masukkan nomor bulan (1-12) atau "all" untuk Semua Bulan:', 'all');
+                    if (chosen !== null) {
+                        runExport(pendingExportFormat, chosen.trim() || 'all');
+                    }
+                }
+            }
+
             const btnExportExcel = document.getElementById('btnExportExcel');
             if (btnExportExcel) {
-                btnExportExcel.addEventListener('click', () => {
-                    pendingExportFormat = 'xlsx';
-                    if (exportMonthModal) exportMonthModal.show();
+                btnExportExcel.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    openMonthChooser('xlsx');
                 });
             }
 
             const btnExportCsv = document.getElementById('btnExportCsv');
             if (btnExportCsv) {
-                btnExportCsv.addEventListener('click', () => {
-                    pendingExportFormat = 'csv';
-                    if (exportMonthModal) exportMonthModal.show();
+                btnExportCsv.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    openMonthChooser('csv');
                 });
             }
 
@@ -589,7 +620,10 @@
             if (btnConfirmExport) {
                 btnConfirmExport.addEventListener('click', () => {
                     const monthVal = selectExportMonth ? selectExportMonth.value : 'all';
-                    if (exportMonthModal) exportMonthModal.hide();
+                    if (exportMonthModalEl && window.bootstrap) {
+                        const inst = bootstrap.Modal.getInstance(exportMonthModalEl);
+                        if (inst) inst.hide();
+                    }
                     runExport(pendingExportFormat, monthVal);
                 });
             }
@@ -598,6 +632,7 @@
             if (reportModal) {
                 reportModal.addEventListener('show.bs.modal', async (event) => {
                     const button = event.relatedTarget;
+                    if (!button) return;
                     const activityId = button.getAttribute('data-activity-id');
                     document.getElementById('modalActivityTitle').textContent = button.getAttribute('data-activity-name');
                     document.getElementById('modalMonthName').textContent = button.getAttribute('data-month-name');
