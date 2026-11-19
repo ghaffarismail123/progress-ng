@@ -1,20 +1,29 @@
 const { Pool } = require('pg');
 
-const pool = new Pool({
+const globalForPg = globalThis;
+const isProduction = process.env.NODE_ENV === 'production';
+
+const pool = globalForPg.__progresNgPool || new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: {
         rejectUnauthorized: false
-    }
+    },
+    max: isProduction ? 1 : 5,
+    idleTimeoutMillis: 10000,
+    connectionTimeoutMillis: 10000
 });
 
-pool.on('connect', () => {
-    console.log('Connected to PostgreSQL database (Supabase) for PROGRES.NG.');
-});
+if (!globalForPg.__progresNgPool) {
+    globalForPg.__progresNgPool = pool;
 
-pool.on('error', (err) => {
-    console.error('Unexpected error on idle client', err);
-    process.exit(-1);
-});
+    pool.on('connect', () => {
+        console.log('Connected to PostgreSQL database (Supabase) for PROGRES.NG.');
+    });
+
+    pool.on('error', (err) => {
+        console.error('Unexpected error on idle client', err);
+    });
+}
 
 // Fungsi inisialisasi tabel otomatis di Supabase (PostgreSQL)
 async function initDB() {
@@ -83,8 +92,11 @@ async function initDB() {
     }
 }
 
-// Jalankan inisialisasi
-initDB();
+// Jalankan inisialisasi sekali per instance
+if (!globalForPg.__progresNgDbInitialized) {
+    globalForPg.__progresNgDbInitialized = true;
+    initDB();
+}
 
 // Helper ekspor query dan pool
 module.exports = {
