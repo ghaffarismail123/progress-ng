@@ -644,7 +644,15 @@
                 return rows;
             }
 
-            // Download Template Pelaporan sesuai format kolom Export
+            function isMonthEditableForTemplate(mNum) {
+                const nowCheck = new Date();
+                const currentYearCheck = nowCheck.getFullYear();
+                const currentMonthCheck = nowCheck.getMonth() + 1;
+                const targetYear = parseInt(yearLabel, 10) || currentYearCheck;
+                return !(targetYear === currentYearCheck && mNum >= currentMonthCheck);
+            }
+
+            // Download Template Pelaporan: seluruh kegiatan x setiap bulan yang bisa diisi
             const btnDownloadTemplate = document.getElementById('btnDownloadTemplate');
             if (btnDownloadTemplate) {
                 btnDownloadTemplate.addEventListener('click', () => {
@@ -652,24 +660,80 @@
                         alert('Library Excel (SheetJS) belum termuat. Silakan muat ulang halaman.');
                         return;
                     }
-                    const sampleAct = exportActivities[0] || { team: 'Sosial', name: 'Contoh Nama Kegiatan / Survei' };
-                    const templateRows = [
-                        {
-                            'Tahun Anggaran': yearLabel,
-                            'Tim': sampleAct.team || 'Sosial',
-                            'Nama Kegiatan / Survei': sampleAct.name || 'Contoh Nama Kegiatan / Survei',
-                            'Bulan': 'Jan',
-                            'Jenis Tahapan': 'Persiapan',
-                            'Status Pelaksanaan': 'Pelaksanaan',
-                            'Besaran Progress (%)': 25,
-                            'Target Tercapai (Publikasi / Laporan / Satuan)': 0,
-                            'Kendala': '',
-                            'Solusi': '',
-                            'Tindak Lanjut': '',
-                            'Tautan Bukti Dukung': ''
-                        }
-                    ];
-                    const ws = XLSX.utils.json_to_sheet(templateRows);
+
+                    const editableMonths = exportMonthLabels
+                        .map((label, idx) => ({ num: idx + 1, label }))
+                        .filter((m) => isMonthEditableForTemplate(m.num));
+
+                    const teamOrder = new Map();
+                    exportTeams.forEach((t, idx) => teamOrder.set(String(t).toLowerCase(), idx));
+
+                    const sortedActivities = [...exportActivities].sort((a, b) => {
+                        const ta = teamOrder.has(String(a.team || '').toLowerCase()) ? teamOrder.get(String(a.team || '').toLowerCase()) : 999;
+                        const tb = teamOrder.has(String(b.team || '').toLowerCase()) ? teamOrder.get(String(b.team || '').toLowerCase()) : 999;
+                        if (ta !== tb) return ta - tb;
+                        return String(a.name || '').localeCompare(String(b.name || ''), 'id');
+                    });
+
+                    const templateRows = [];
+                    sortedActivities.forEach((act) => {
+                        editableMonths.forEach((mObj) => {
+                            const existingRep = exportReports.find(
+                                (r) => r && Number(r.activity_id) === Number(act.id) && Number(r.month) === mObj.num
+                            );
+
+                            if (existingRep) {
+                                templateRows.push({
+                                    'Tahun Anggaran': yearLabel,
+                                    'Tim': act.team || '',
+                                    'Nama Kegiatan / Survei': act.name || '',
+                                    'Bulan': mObj.label,
+                                    'Jenis Tahapan': existingRep.stage_type || 'Persiapan',
+                                    'Status Pelaksanaan': existingRep.stage_status || 'Pelaksanaan',
+                                    'Besaran Progress (%)': (existingRep.progress_percentage !== null && existingRep.progress_percentage !== undefined && existingRep.progress_percentage !== '') ? Number(existingRep.progress_percentage) : 0,
+                                    'Target Tercapai (Publikasi / Laporan / Satuan)': getTargetAchievedValue(existingRep),
+                                    'Kendala': existingRep.description || '',
+                                    'Solusi': existingRep.problem || '',
+                                    'Tindak Lanjut': existingRep.follow_up || '',
+                                    'Tautan Bukti Dukung': existingRep.proof_link || ''
+                                });
+                            } else {
+                                templateRows.push({
+                                    'Tahun Anggaran': yearLabel,
+                                    'Tim': act.team || '',
+                                    'Nama Kegiatan / Survei': act.name || '',
+                                    'Bulan': mObj.label,
+                                    'Jenis Tahapan': 'Persiapan',
+                                    'Status Pelaksanaan': 'Pelaksanaan',
+                                    'Besaran Progress (%)': 0,
+                                    'Target Tercapai (Publikasi / Laporan / Satuan)': 0,
+                                    'Kendala': '',
+                                    'Solusi': '',
+                                    'Tindak Lanjut': '',
+                                    'Tautan Bukti Dukung': ''
+                                });
+                            }
+                        });
+                    });
+
+                    const ws = XLSX.utils.json_to_sheet(
+                        templateRows.length
+                            ? templateRows
+                            : [{
+                                'Tahun Anggaran': yearLabel,
+                                'Tim': '',
+                                'Nama Kegiatan / Survei': '',
+                                'Bulan': '',
+                                'Jenis Tahapan': 'Persiapan',
+                                'Status Pelaksanaan': 'Pelaksanaan',
+                                'Besaran Progress (%)': 0,
+                                'Target Tercapai (Publikasi / Laporan / Satuan)': 0,
+                                'Kendala': '',
+                                'Solusi': '',
+                                'Tindak Lanjut': '',
+                                'Tautan Bukti Dukung': ''
+                            }]
+                    );
                     const wb = XLSX.utils.book_new();
                     XLSX.utils.book_append_sheet(wb, ws, 'Template_Pelaporan');
                     XLSX.writeFile(wb, `Template_Pelaporan_Kinerja_TA_${yearLabel}.xlsx`);

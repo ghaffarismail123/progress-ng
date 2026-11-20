@@ -63,6 +63,7 @@ function injectFavicon(html) {
 
     return updated;
 }
+
 // Pasang favicon BPS otomatis untuk semua halaman HTML/EJS (baik res.render maupun res.send)
 app.use((req, res, next) => {
     const originalSend = res.send.bind(res);
@@ -89,11 +90,54 @@ app.use((req, res, next) => {
     next();
 });
 
+let schemaEnsured = false;
+async function ensureSchemaColumns() {
+    if (schemaEnsured) return;
+    try {
+        await db.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS target INTEGER DEFAULT 0`);
+        await db.query(`ALTER TABLE reports ADD COLUMN IF NOT EXISTS target_achieved INTEGER DEFAULT 0`);
+        schemaEnsured = true;
+    } catch (err) {
+        console.error('Gagal memastikan kolom schema:', err.message);
+    }
+}
+
+function parseNonNegativeInt(val, fallback = 0) {
+    if (val === undefined || val === null || String(val).trim() === '') return fallback;
+    const cleaned = String(val).replace(/[^0-9]/g, '');
+    if (!cleaned) return fallback;
+    const num = parseInt(cleaned, 10);
+    return Number.isNaN(num) ? fallback : num;
+}
+
+function parseMonthInput(rawMonth) {
+    if (rawMonth === undefined || rawMonth === null) return null;
+    const str = String(rawMonth).trim().toLowerCase();
+    if (!str || str === '-') return null;
+    const num = parseInt(str, 10);
+    if (!Number.isNaN(num) && num >= 1 && num <= 12) return num;
+    const monthMap = {
+        'jan': 1, 'januari': 1,
+        'feb': 2, 'februari': 2,
+        'mar': 3, 'maret': 3,
+        'apr': 4, 'april': 4,
+        'mei': 5, 'may': 5,
+        'jun': 6, 'juni': 6,
+        'jul': 7, 'juli': 7,
+        'agu': 8, 'ags': 8, 'agustus': 8,
+        'sep': 9, 'september': 9,
+        'okt': 10, 'oct': 10, 'oktober': 10,
+        'nov': 11, 'nopember': 11, 'november': 11,
+        'des': 12, 'dec': 12, 'desember': 12
+    };
+    return monthMap[str] || null;
+}
+
 function calculateProgressData(activities, reports) {
     const totalActivities = activities.length;
     if (totalActivities === 0) return { totalActivities: 0, completedActivities: 0, overallProgress: 0, monthlyTrend: Array(12).fill(0), teamProgress: [], statusCount: {} };
 
-    const teams = ['Sosial', 'Distribusi', 'Produksi', 'Neraca', 'IPDS', 'Sektoral', 'Umum'];
+    const teams = ['Sosial', 'Distribusi', 'Produksi', 'Neraca', 'IPDS', 'Sektoral', 'Umum', 'Reformasi Birokrasi & PEKPPP'];
     let statusCount = { 'Perencanaan': 0, 'Persiapan': 0, 'Pelaksanaan': 0, 'Selesai': 0, 'Belum Lapor': 0 };
     let cumulativeByMonth = Array(12).fill(0);
 
@@ -143,6 +187,7 @@ function calculateProgressData(activities, reports) {
 // 1. Dashboard
 app.get('/', async (req, res) => {
     try {
+        await ensureSchemaColumns();
         const selectedYear = req.query.year || '2026';
         const actRes = await db.query(`SELECT * FROM activities`);
         const repRes = await db.query(`SELECT * FROM reports`);
@@ -157,12 +202,14 @@ app.get('/', async (req, res) => {
 // 2. Entri Kegiatan (Dengan pesan status import & hapus)
 app.get('/entry', async (req, res) => {
     try {
+        await ensureSchemaColumns();
+        const selectedYear = req.query.year || '2026';
         const search = req.query.search || '';
         const msg = req.query.msg || '';
         const query = `SELECT * FROM activities WHERE name ILIKE $1 OR ro_code ILIKE $2 OR team ILIKE $3 OR sub_team ILIKE $4 ORDER BY team, id DESC`;
         const param = `%${search}%`;
         const result = await db.query(query, [param, param, param, param]);
-        res.render('entry', { activities: result.rows || [], search, msg, activePage: 'entry' });
+        res.render('entry', { activities: result.rows || [], search, msg, selectedYear, activePage: 'entry' });
     } catch (err) {
         console.error('Error entry:', err);
         res.status(500).send('Database Error: ' + err.message);
@@ -172,10 +219,12 @@ app.get('/entry', async (req, res) => {
 // Tambah Kegiatan Manual -> Otomatis terintegrasi ke Pelaporan & Dashboard
 app.post('/entry/add', async (req, res) => {
     try {
-        const { team, sub_team, ro_code, name, jenis } = req.body;
+        await ensureSchemaColumns();
+        const { team, sub_team, ro_code, name, jenis, target } = req.body;
+        const targetVal = parseNonNegativeInt(target, 0);
         await db.query(
-            `INSERT INTO activities (team, sub_team, ro_code, name, jenis) VALUES ($1, $2, $3, $4, $5)`,
-            [team, sub_team, ro_code, name, jenis]
+            `INSERT INTO activities (team, sub_team, ro_code, name, jenis, target) VALUES ($1, $2, $3, $4, $5, $6)`,
+            [team, sub_team, ro_code, name, jenis, targetVal]
         );
         res.redirect('/entry?msg=Kegiatan+baru+berhasil+ditambahkan');
     } catch (err) {
@@ -186,10 +235,12 @@ app.post('/entry/add', async (req, res) => {
 // Edit Kegiatan
 app.post('/entry/edit', async (req, res) => {
     try {
-        const { id, team, sub_team, ro_code, name, jenis } = req.body;
+        await ensureSchemaColumns();
+        const { id, team, sub_team, ro_code, name, jenis, target } = req.body;
+        const targetVal = parseNonNegativeInt(target, 0);
         await db.query(
-            `UPDATE activities SET team = $1, sub_team = $2, ro_code = $3, name = $4, jenis = $5 WHERE id = $6`,
-            [team, sub_team, ro_code, name, jenis, id]
+            `UPDATE activities SET team = $1, sub_team = $2, ro_code = $3, name = $4, jenis = $5, target = $6 WHERE id = $7`,
+            [team, sub_team, ro_code, name, jenis, targetVal, id]
         );
         res.redirect('/entry?msg=' + encodeURIComponent('Kegiatan berhasil diperbarui.'));
     } catch (err) {
@@ -198,13 +249,15 @@ app.post('/entry/edit', async (req, res) => {
     }
 });
 
-// Fitur Import Excel Kegiatan (Sesuai struktur kolom: No | Kode RO | Tim | Sub Tim | Nama Kegiatan)
+// Fitur Import Excel Kegiatan (Sesuai struktur kolom: No | Kode RO | Tim | Sub Tim | Nama Kegiatan | Jenis | Target)
 app.post('/entry/import', upload.single('excel_file'), async (req, res) => {
     try {
+        await ensureSchemaColumns();
         if (!req.file) {
             return res.redirect('/entry?msg=File+belum+dipilih');
         }
 
+        const defaultTarget = parseNonNegativeInt(req.body.default_target, 0);
         const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
         const extractedActivities = [];
 
@@ -212,12 +265,23 @@ app.post('/entry/import', upload.single('excel_file'), async (req, res) => {
             const sheet = workbook.Sheets[sheetName];
             const rows = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 
+            let targetColIndex = -1;
+            for (const r of rows) {
+                if (!Array.isArray(r)) continue;
+                const foundIdx = r.findIndex(cell => String(cell || '').trim().toLowerCase() === 'target');
+                if (foundIdx !== -1) {
+                    targetColIndex = foundIdx;
+                    break;
+                }
+            }
+
             rows.forEach((row) => {
                 const colB = String(row[1] || '').trim();
                 const colC = String(row[2] || '').trim();
                 const colD = String(row[3] || '').trim();
                 const colE = String(row[4] || '').trim();
                 const colF = String(row[5] || '').trim();
+                const rawTargetCell = targetColIndex !== -1 ? row[targetColIndex] : row[6];
 
                 if (!colB || !colC || !colE) return;
                 if (['kode ro', 'ro', 'tim', 'no'].includes(colB.toLowerCase()) || ['tim', 'tim kerja'].includes(colC.toLowerCase())) {
@@ -229,7 +293,8 @@ app.post('/entry/import', upload.single('excel_file'), async (req, res) => {
                     team: colC,
                     sub_team: colD || '-',
                     name: colE,
-                    jenis: colF || (colE.toLowerCase().includes('publikasi') ? 'Publikasi' : (colE.toLowerCase().includes('laporan') ? 'Laporan' : 'Survei/Kegiatan'))
+                    jenis: colF || (colE.toLowerCase().includes('publikasi') ? 'Publikasi' : (colE.toLowerCase().includes('laporan') ? 'Laporan' : 'Survei/Kegiatan')),
+                    target: parseNonNegativeInt(rawTargetCell, defaultTarget)
                 });
             });
         });
@@ -250,10 +315,15 @@ app.post('/entry/import', upload.single('excel_file'), async (req, res) => {
 
                 if (existing.rows.length === 0) {
                     await db.query(
-                        `INSERT INTO activities (team, sub_team, ro_code, name, jenis) VALUES ($1, $2, $3, $4, $5)`,
-                        [item.team, item.sub_team, item.ro_code, item.name, item.jenis]
+                        `INSERT INTO activities (team, sub_team, ro_code, name, jenis, target) VALUES ($1, $2, $3, $4, $5, $6)`,
+                        [item.team, item.sub_team, item.ro_code, item.name, item.jenis, item.target]
                     );
                     inserted++;
+                } else {
+                    await db.query(
+                        `UPDATE activities SET target = $1 WHERE id = $2`,
+                        [item.target, existing.rows[0].id]
+                    );
                 }
             } catch (insertErr) {
                 console.error('PostgreSQL Insert Error:', insertErr.message);
@@ -304,22 +374,108 @@ app.post('/entry/delete/:id', async (req, res) => {
 // 3. Pelaporan Bulanan (Otomatis mengambil data dari tabel activities pusat)
 app.get('/pelaporan', async (req, res) => {
     try {
+        await ensureSchemaColumns();
+        const selectedYear = req.query.year || '2026';
         const actRes = await db.query(`SELECT * FROM activities ORDER BY team`);
         const repRes = await db.query(`SELECT * FROM reports`);
-        const teams = ['Sosial', 'Distribusi', 'Produksi', 'Neraca', 'IPDS', 'Sektoral', 'Umum'];
-        res.render('pelaporan', { teams, activities: actRes.rows || [], reports: repRes.rows || [], activePage: 'pelaporan' });
+        const teams = ['Sosial', 'Distribusi', 'Produksi', 'Neraca', 'IPDS', 'Sektoral', 'Umum', 'Reformasi Birokrasi & PEKPPP'];
+        res.render('pelaporan', { teams, activities: actRes.rows || [], reports: repRes.rows || [], selectedYear, activePage: 'pelaporan' });
     } catch (err) {
         console.error('Error pelaporan:', err);
         res.status(500).send('Database Error: ' + err.message);
     }
 });
 
+// Import Pelaporan Kinerja dari Excel / CSV (Sesuai format Template & Export)
+app.post('/pelaporan/import', upload.single('pelaporan_file'), async (req, res) => {
+    try {
+        await ensureSchemaColumns();
+        if (!req.file) {
+            return res.redirect('/pelaporan?error=' + encodeURIComponent('File import pelaporan belum dipilih.'));
+        }
+
+        const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
+        const actRes = await db.query(`SELECT id, name, team FROM activities`);
+        const allActivities = actRes.rows || [];
+
+        let importedCount = 0;
+
+        for (const sheetName of workbook.SheetNames) {
+            const sheet = workbook.Sheets[sheetName];
+            const rows = xlsx.utils.sheet_to_json(sheet, { defval: '' });
+
+            for (const row of rows) {
+                const actName = String(row['Nama Kegiatan / Survei'] || row['Nama Kegiatan'] || row['name'] || '').trim();
+                const teamName = String(row['Tim'] || row['team'] || '').trim();
+                const mNum = parseMonthInput(row['Bulan'] || row['month']);
+
+                if (!actName || !mNum) continue;
+
+                const matchedAct = allActivities.find(a => {
+                    const sameName = String(a.name || '').trim().toLowerCase() === actName.toLowerCase();
+                    if (!teamName) return sameName;
+                    return sameName && String(a.team || '').trim().toLowerCase() === teamName.toLowerCase();
+                }) || allActivities.find(a => String(a.name || '').trim().toLowerCase() === actName.toLowerCase());
+
+                if (!matchedAct) continue;
+
+                const rawStageType = String(row['Jenis Tahapan'] || row['stage_type'] || 'Persiapan').trim();
+                const stageType = rawStageType || 'Persiapan';
+                const rawStageStatus = String(row['Status Pelaksanaan'] || row['stage_status'] || 'Pelaksanaan').trim();
+                const progressVal = parseFloat(row['Besaran Progress (%)'] !== undefined && row['Besaran Progress (%)'] !== '' ? row['Besaran Progress (%)'] : (row['progress_percentage'] || 0));
+                const safeProgress = Number.isNaN(progressVal) ? 0 : Math.min(100, Math.max(0, progressVal));
+                const isCompletedFlag = safeProgress >= 100 ? 1 : 0;
+                const finalStatus = safeProgress >= 100 ? 'Selesai' : (rawStageStatus || 'Pelaksanaan');
+
+                const rawTarget = row['Target Tercapai (Publikasi / Laporan / Satuan)'] !== undefined
+                    ? row['Target Tercapai (Publikasi / Laporan / Satuan)']
+                    : (row['target_achieved'] || 0);
+                const targetAchieved = parseNonNegativeInt(rawTarget, 0);
+
+                const description = String(row['Kendala'] || row['Uraian / Catatan Kegiatan'] || row['description'] || '').trim();
+                const problem = String(row['Solusi'] || row['Permasalahan'] || row['problem'] || '').trim();
+                const followUp = String(row['Tindak Lanjut'] || row['follow_up'] || '').trim();
+                const proofLink = String(row['Tautan Bukti Dukung'] || row['proof_link'] || '').trim();
+
+                const existingRes = await db.query(
+                    `SELECT id FROM reports WHERE activity_id = $1 AND month = $2 AND stage_type = $3`,
+                    [matchedAct.id, mNum, stageType]
+                );
+
+                if (existingRes.rows && existingRes.rows.length > 0) {
+                    await db.query(
+                        `UPDATE reports SET stage_status = $1, progress_percentage = $2, target_achieved = $3, description = $4, problem = $5, follow_up = $6, proof_link = $7, is_completed = $8 WHERE id = $9`,
+                        [finalStatus, safeProgress, targetAchieved, description, problem, followUp, proofLink, isCompletedFlag, existingRes.rows[0].id]
+                    );
+                } else {
+                    await db.query(
+                        `INSERT INTO reports (activity_id, month, stage_type, stage_status, progress_percentage, target_achieved, description, problem, follow_up, proof_link, is_completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                        [matchedAct.id, mNum, stageType, finalStatus, safeProgress, targetAchieved, description, problem, followUp, proofLink, isCompletedFlag]
+                    );
+                }
+                importedCount++;
+            }
+        }
+
+        if (importedCount === 0) {
+            return res.redirect('/pelaporan?error=' + encodeURIComponent('Tidak ada baris laporan valid yang cocok dengan kegiatan di database.'));
+        }
+
+        return res.redirect('/pelaporan?success=1&msg=' + encodeURIComponent(`Berhasil mengimpor ${importedCount} baris data pelaporan kinerja.`));
+    } catch (err) {
+        console.error('Error import pelaporan:', err);
+        return res.redirect('/pelaporan?error=' + encodeURIComponent('Gagal mengimpor pelaporan: ' + err.message));
+    }
+});
+
 // Simpan Laporan dengan Validasi & Status Selesai Otomatis Jika Progress 100%
 app.post('/pelaporan/save', async (req, res) => {
     try {
-        const { activity_id, month, stage_type, stage_status, progress_percentage, description, problem, follow_up, proof_link } = req.body;
+        await ensureSchemaColumns();
+        const { activity_id, month, stage_type, stage_status, progress_percentage, target_achieved, description, problem, follow_up, proof_link } = req.body;
         const newProgress = parseFloat(progress_percentage);
         const mNum = parseInt(month);
+        const targetAchievedVal = parseNonNegativeInt(target_achieved, 0);
         const isCompletedFlag = newProgress >= 100 ? 1 : 0;
         const finalStatus = newProgress >= 100 ? 'Selesai' : stage_status;
 
@@ -349,14 +505,14 @@ app.post('/pelaporan/save', async (req, res) => {
         if (existingRes.rows && existingRes.rows.length > 0) {
             const rowId = existingRes.rows[0].id;
             await db.query(
-                `UPDATE reports SET stage_status = $1, progress_percentage = $2, description = $3, problem = $4, follow_up = $5, proof_link = $6, is_completed = $7 WHERE id = $8`,
-                [finalStatus, newProgress, description, problem, follow_up, proof_link, isCompletedFlag, rowId]
+                `UPDATE reports SET stage_status = $1, progress_percentage = $2, target_achieved = $3, description = $4, problem = $5, follow_up = $6, proof_link = $7, is_completed = $8 WHERE id = $9`,
+                [finalStatus, newProgress, targetAchievedVal, description, problem, follow_up, proof_link, isCompletedFlag, rowId]
             );
             res.redirect('/pelaporan?success=1');
         } else {
             await db.query(
-                `INSERT INTO reports (activity_id, month, stage_type, stage_status, progress_percentage, description, problem, follow_up, proof_link, is_completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-                [activity_id, mNum, stage_type, finalStatus, newProgress, description, problem, follow_up, proof_link, isCompletedFlag]
+                `INSERT INTO reports (activity_id, month, stage_type, stage_status, progress_percentage, target_achieved, description, problem, follow_up, proof_link, is_completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                [activity_id, mNum, stage_type, finalStatus, newProgress, targetAchievedVal, description, problem, follow_up, proof_link, isCompletedFlag]
             );
             res.redirect('/pelaporan?success=1');
         }
@@ -367,6 +523,7 @@ app.post('/pelaporan/save', async (req, res) => {
 
 app.get('/api/report', async (req, res) => {
     try {
+        await ensureSchemaColumns();
         const { activity_id, month, stage_type } = req.query;
         const result = await db.query(
             `SELECT * FROM reports WHERE activity_id = $1 AND month = $2 AND stage_type = $3`,
