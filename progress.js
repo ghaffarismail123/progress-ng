@@ -96,6 +96,7 @@ async function ensureSchemaColumns() {
     try {
         await db.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS target INTEGER DEFAULT 0`);
         await db.query(`ALTER TABLE reports ADD COLUMN IF NOT EXISTS target_achieved INTEGER DEFAULT 0`);
+        await db.query(`ALTER TABLE reports ADD COLUMN IF NOT EXISTS year INTEGER DEFAULT 2026`);
         schemaEnsured = true;
     } catch (err) {
         console.error('Gagal memastikan kolom schema:', err.message);
@@ -108,6 +109,36 @@ function parseNonNegativeInt(val, fallback = 0) {
     if (!cleaned) return fallback;
     const num = parseInt(cleaned, 10);
     return Number.isNaN(num) ? fallback : num;
+}
+
+function parseProgressValue(rawVal) {
+    if (rawVal === undefined || rawVal === null || String(rawVal).trim() === '') return 0;
+    if (typeof rawVal === 'number') {
+        return Number.isNaN(rawVal) ? 0 : Math.min(100, Math.max(0, rawVal));
+    }
+    const normalized = String(rawVal).replace('%', '').replace(',', '.').trim();
+    const num = parseFloat(normalized);
+    return Number.isNaN(num) ? 0 : Math.min(100, Math.max(0, num));
+}
+
+function getRowProgressRaw(row) {
+    if (row['Besaran Progress (%)'] !== undefined && row['Besaran Progress (%)'] !== '') {
+        return row['Besaran Progress (%)'];
+    }
+    if (row['Besaran Progress ()'] !== undefined && row['Besaran Progress ()'] !== '') {
+        return row['Besaran Progress ()'];
+    }
+    if (row['Besaran Progress'] !== undefined && row['Besaran Progress'] !== '') {
+        return row['Besaran Progress'];
+    }
+    if (row['progress_percentage'] !== undefined && row['progress_percentage'] !== '') {
+        return row['progress_percentage'];
+    }
+    const progressKey = Object.keys(row).find(k => String(k || '').toLowerCase().includes('progress'));
+    if (progressKey && row[progressKey] !== undefined && row[progressKey] !== '') {
+        return row[progressKey];
+    }
+    return 0;
 }
 
 function parseMonthInput(rawMonth) {
@@ -408,6 +439,8 @@ app.post('/pelaporan/import', upload.single('pelaporan_file'), async (req, res) 
                 const actName = String(row['Nama Kegiatan / Survei'] || row['Nama Kegiatan'] || row['name'] || '').trim();
                 const teamName = String(row['Tim'] || row['team'] || '').trim();
                 const mNum = parseMonthInput(row['Bulan'] || row['month']);
+                const rawYear = row['Tahun Anggaran'] || row['Tahun'] || row['year'] || req.body.year || 2026;
+                const parsedYear = parseInt(String(rawYear).replace(/[^0-9]/g, ''), 10) || 2026;
 
                 if (!actName || !mNum) continue;
 
@@ -419,20 +452,22 @@ app.post('/pelaporan/import', upload.single('pelaporan_file'), async (req, res) 
 
                 if (!matchedAct) continue;
 
-                const rawStageType = String(row['Jenis Tahapan'] || row['stage_type'] || 'Persiapan').trim();
+                const rawStageType = String(row['Jenis Tahapan'] || row['stage_type'] || '').trim();
                 const stageType = rawStageType || 'Persiapan';
-                const rawStageStatus = String(row['Status Pelaksanaan'] || row['stage_status'] || 'Pelaksanaan').trim();
-                const progressVal = parseFloat(row['Besaran Progress (%)'] !== undefined && row['Besaran Progress (%)'] !== '' ? row['Besaran Progress (%)'] : (row['progress_percentage'] || 0));
-                const safeProgress = Number.isNaN(progressVal) ? 0 : Math.min(100, Math.max(0, progressVal));
+                const rawStageStatus = String(row['Status Pelaksanaan'] || row['stage_status'] || '').trim();
+                const safeProgress = parseProgressValue(getRowProgressRaw(row));
                 const isCompletedFlag = safeProgress >= 100 ? 1 : 0;
-                const finalStatus = safeProgress >= 100 ? 'Selesai' : (rawStageStatus || 'Pelaksanaan');
+                const finalStatus = safeProgress >= 100
+                    ? 'Selesai'
+                    : ((!rawStageStatus || rawStageStatus.toLowerCase() === 'belum ada laporan') ? 'Pelaksanaan' : rawStageStatus);
 
                 const rawTarget = row['Target Tercapai (Publikasi / Laporan / Satuan)'] !== undefined
                     ? row['Target Tercapai (Publikasi / Laporan / Satuan)']
                     : (row['target_achieved'] || 0);
                 const targetAchieved = parseNonNegativeInt(rawTarget, 0);
 
-                const description = String(row['Kendala'] || row['Uraian / Catatan Kegiatan'] || row['description'] || '').trim();
+                const rawDesc = String(row['Kendala'] || row['Uraian / Catatan Kegiatan'] || row['description'] || '').trim();
+                const description = rawDesc === '-' ? '' : rawDesc;
                 const problem = String(row['Solusi'] || row['Permasalahan'] || row['problem'] || '').trim();
                 const followUp = String(row['Tindak Lanjut'] || row['follow_up'] || '').trim();
                 const proofLink = String(row['Tautan Bukti Dukung'] || row['proof_link'] || '').trim();
@@ -444,13 +479,13 @@ app.post('/pelaporan/import', upload.single('pelaporan_file'), async (req, res) 
 
                 if (existingRes.rows && existingRes.rows.length > 0) {
                     await db.query(
-                        `UPDATE reports SET stage_status = $1, progress_percentage = $2, target_achieved = $3, description = $4, problem = $5, follow_up = $6, proof_link = $7, is_completed = $8 WHERE id = $9`,
-                        [finalStatus, safeProgress, targetAchieved, description, problem, followUp, proofLink, isCompletedFlag, existingRes.rows[0].id]
+                        `UPDATE reports SET year = $1, stage_status = $2, progress_percentage = $3, target_achieved = $4, description = $5, problem = $6, follow_up = $7, proof_link = $8, is_completed = $9 WHERE id = $10`,
+                        [parsedYear, finalStatus, safeProgress, targetAchieved, description, problem, followUp, proofLink, isCompletedFlag, existingRes.rows[0].id]
                     );
                 } else {
                     await db.query(
-                        `INSERT INTO reports (activity_id, month, stage_type, stage_status, progress_percentage, target_achieved, description, problem, follow_up, proof_link, is_completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-                        [matchedAct.id, mNum, stageType, finalStatus, safeProgress, targetAchieved, description, problem, followUp, proofLink, isCompletedFlag]
+                        `INSERT INTO reports (activity_id, month, year, stage_type, stage_status, progress_percentage, target_achieved, description, problem, follow_up, proof_link, is_completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+                        [matchedAct.id, mNum, parsedYear, stageType, finalStatus, safeProgress, targetAchieved, description, problem, followUp, proofLink, isCompletedFlag]
                     );
                 }
                 importedCount++;
@@ -506,13 +541,13 @@ app.post('/pelaporan/save', async (req, res) => {
             const rowId = existingRes.rows[0].id;
             await db.query(
                 `UPDATE reports SET stage_status = $1, progress_percentage = $2, target_achieved = $3, description = $4, problem = $5, follow_up = $6, proof_link = $7, is_completed = $8 WHERE id = $9`,
-                [finalStatus, newProgress, targetAchievedVal, description, problem, follow_up, proof_link, isCompletedFlag, rowId]
+                [finalStatus, newProgress, targetAchievedVal, description, problem, follow_up, proofLink, isCompletedFlag, rowId]
             );
             res.redirect('/pelaporan?success=1');
         } else {
             await db.query(
                 `INSERT INTO reports (activity_id, month, stage_type, stage_status, progress_percentage, target_achieved, description, problem, follow_up, proof_link, is_completed) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-                [activity_id, mNum, stage_type, finalStatus, newProgress, targetAchievedVal, description, problem, follow_up, proof_link, isCompletedFlag]
+                [activity_id, mNum, stage_type, finalStatus, newProgress, targetAchievedVal, description, problem, follow_up, proofLink, isCompletedFlag]
             );
             res.redirect('/pelaporan?success=1');
         }
