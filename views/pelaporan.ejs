@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pelaporan - PROGRES.NG BPS Bangka Tengah</title>
+    <link rel="icon" type="image/png" href="/img/bps.png">
+    <link rel="shortcut icon" type="image/png" href="/img/bps.png">
+    <link rel="apple-touch-icon" href="/img/bps.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/style.css">
@@ -188,23 +191,31 @@
                     <div>
                         <h2 class="mb-0">Pelaporan Kinerja per Kegiatan</h2>
                     </div>
-                    <!-- Menu Export -->
-                    <div class="dropdown">
-                        <button class="btn btn-sm btn-success dropdown-toggle fw-semibold px-3" type="button" id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="fa-solid fa-file-export me-1"></i> Export
+                    <!-- Tombol Download Template, Import & Menu Export -->
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary fw-semibold px-3" id="btnDownloadTemplate">
+                            <i class="fa-solid fa-download me-1"></i> Download Template
                         </button>
-                        <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="exportDropdown">
-                            <li>
-                                <button class="dropdown-item small py-2" type="button" id="btnExportExcel">
-                                    <i class="fa-solid fa-file-excel text-success me-2"></i> Export Excel (.xlsx)
-                                </button>
-                            </li>
-                            <li>
-                                <button class="dropdown-item small py-2" type="button" id="btnExportCsv">
-                                    <i class="fa-solid fa-file-csv text-primary me-2"></i> Export CSV (.csv)
-                                </button>
-                            </li>
-                        </ul>
+                        <button type="button" class="btn btn-sm btn-primary fw-semibold px-3" data-bs-toggle="modal" data-bs-target="#importPelaporanModal">
+                            <i class="fa-solid fa-file-import me-1"></i> Import
+                        </button>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-success dropdown-toggle fw-semibold px-3" type="button" id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fa-solid fa-file-export me-1"></i> Export
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm" aria-labelledby="exportDropdown">
+                                <li>
+                                    <button class="dropdown-item small py-2" type="button" id="btnExportExcel">
+                                        <i class="fa-solid fa-file-excel text-success me-2"></i> Export Excel (.xlsx)
+                                    </button>
+                                </li>
+                                <li>
+                                    <button class="dropdown-item small py-2" type="button" id="btnExportCsv">
+                                        <i class="fa-solid fa-file-csv text-primary me-2"></i> Export CSV (.csv)
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
 
@@ -292,6 +303,33 @@
                         </div>
                     <% } %>
                 <% }) %>
+            </div>
+
+            <!-- Modal Import Pelaporan -->
+            <div class="modal fade" id="importPelaporanModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <form action="/pelaporan/import" method="POST" enctype="multipart/form-data">
+                            <div class="modal-header">
+                                <h5 class="modal-title"><i class="fa-solid fa-file-import text-primary me-2"></i>Import Data Pelaporan Kinerja</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label for="pelaporanImportFile" class="form-label fw-bold">Pilih File Excel (.xlsx / .xls) atau CSV (.csv)</label>
+                                    <input type="file" id="pelaporanImportFile" name="pelaporan_file" class="form-control" accept=".xlsx,.xls,.csv" required>
+                                    <div class="form-text text-muted mt-2">
+                                        Struktur kolom sesuai hasil Export: <code>Tahun Anggaran</code>, <code>Tim</code>, <code>Nama Kegiatan / Survei</code>, <code>Bulan</code>, <code>Jenis Tahapan</code>, <code>Status Pelaksanaan</code>, <code>Besaran Progress (%)</code>, <code>Target Tercapai (Publikasi / Laporan / Satuan)</code>, <code>Kendala</code>, <code>Solusi</code>, <code>Tindak Lanjut</code>, <code>Tautan Bukti Dukung</code>.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
+                                <button type="submit" class="btn btn-sm btn-primary fw-semibold">Mulai Import</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             </div>
 
             <!-- Modal Pilihan Bulan Export -->
@@ -428,7 +466,7 @@
                         </div>
                         <div class="modal-body py-4 text-center">
                             <i class="fa-solid fa-circle-check text-success mb-3" style="font-size: 3rem;"></i>
-                            <p class="fw-semibold text-dark mb-0">Data progres dan laporan kinerja telah berhasil disimpan.</p>
+                            <p class="fw-semibold text-dark mb-0" id="successSaveText">Data progres dan laporan kinerja telah berhasil disimpan.</p>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-success fw-semibold px-4" data-bs-dismiss="modal">OK</button>
@@ -446,6 +484,16 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <script>
+        (function ensureFavicon() {
+            const probe = new Image();
+            probe.onerror = function () {
+                document.querySelectorAll('link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]').forEach(function (lnk) {
+                    lnk.href = '/img/bps1.png';
+                });
+            };
+            probe.src = '/img/bps.png';
+        })();
+
         function updateClock() {
             const el = document.getElementById('realtimeClock');
             if (!el) return;
@@ -467,7 +515,11 @@
                 }
                 window.history.replaceState({}, document.title, window.location.pathname);
             } else if (urlParams.get('success')) {
+                const succText = document.getElementById('successSaveText');
                 const succModalEl = document.getElementById('successSaveModal');
+                if (succText && urlParams.get('msg')) {
+                    succText.textContent = urlParams.get('msg');
+                }
                 if (succModalEl && window.bootstrap) {
                     bootstrap.Modal.getOrCreateInstance(succModalEl).show();
                 }
@@ -590,6 +642,38 @@
                 });
 
                 return rows;
+            }
+
+            // Download Template Pelaporan sesuai format kolom Export
+            const btnDownloadTemplate = document.getElementById('btnDownloadTemplate');
+            if (btnDownloadTemplate) {
+                btnDownloadTemplate.addEventListener('click', () => {
+                    if (typeof XLSX === 'undefined') {
+                        alert('Library Excel (SheetJS) belum termuat. Silakan muat ulang halaman.');
+                        return;
+                    }
+                    const sampleAct = exportActivities[0] || { team: 'Sosial', name: 'Contoh Nama Kegiatan / Survei' };
+                    const templateRows = [
+                        {
+                            'Tahun Anggaran': yearLabel,
+                            'Tim': sampleAct.team || 'Sosial',
+                            'Nama Kegiatan / Survei': sampleAct.name || 'Contoh Nama Kegiatan / Survei',
+                            'Bulan': 'Jan',
+                            'Jenis Tahapan': 'Persiapan',
+                            'Status Pelaksanaan': 'Pelaksanaan',
+                            'Besaran Progress (%)': 25,
+                            'Target Tercapai (Publikasi / Laporan / Satuan)': 0,
+                            'Kendala': '',
+                            'Solusi': '',
+                            'Tindak Lanjut': '',
+                            'Tautan Bukti Dukung': ''
+                        }
+                    ];
+                    const ws = XLSX.utils.json_to_sheet(templateRows);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, 'Template_Pelaporan');
+                    XLSX.writeFile(wb, `Template_Pelaporan_Kinerja_TA_${yearLabel}.xlsx`);
+                });
             }
 
             function runExport(format, monthVal) {
